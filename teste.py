@@ -35,8 +35,8 @@ np.random.seed(42)
 # Autenticação simples (protótipo sem libs externas)
 # =============================
 DEFAULT_USERS = {
-    "admin": {"name": "Admin", "password": "12345", "role": "admin"},
-    "guest": {"name": "Convidado", "password": "guest123", "role": "guest"},
+    "bruno": {"name": "bruno", "password": "Bruno@1828", "role": "admin"},
+    "convidado": {"name": "convidado", "password": "convidado1234", "role": "guest"},
 }
 
 if 'auth' not in st.session_state:
