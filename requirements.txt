@@ -4,4 +4,4 @@ numpy
 plotly
 pyarrow
 faker
-streamlit-authenticator
+streamlit-authenticator==0.3.2
