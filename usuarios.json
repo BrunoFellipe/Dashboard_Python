@@ -1,5 +1,9 @@
 [
   {"username": "admin", "name": "Admin", "password": "12345", "role": "admin"},
   {"username": "guest", "name": "Convidado", "password": "guest123", "role": "guest"},
-  {"username": "maria", "name": "Maria Oliveira", "password": "maria@2025", "role": "guest"}
+  {"username": "maria", "name": "Maria Oliveira", "password": "maria@2025", "role": "guest"},
+  {"username": "bruno", "name": "Bruno Fellipe", "password": "bruno@2025", "role": "admin"},
+  {"username": "lecivaldo", "name": "Lecivaldo Santana", "password": "leci@2025", "role": "admin"},
+  {"username": "matheus", "name": "Matheus Quiarati", "password": "matheus@2025", "role": "guest"},
+  {"username": "ana", "name": "Ana Carolina", "password": "ana@2025", "role": "guest"}
 ]

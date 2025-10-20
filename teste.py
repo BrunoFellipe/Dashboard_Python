@@ -1,7 +1,7 @@
 """
 Dashboard Corporativo – Contexto Brasileiro (Streamlit)
 Versão Híbrida (Desktop + Mobile) com Login obrigatório + Home + Hub de Notícias (Auto + Manual)
-Agora com integração de usuários e notícias via arquivos JSON externos.
+Agora com integração de usuários e notícias via arquivos JSON externos e correção dos botões de navegação.
 
 Requisitos:
     pip install streamlit pandas numpy pyarrow plotly faker
@@ -189,11 +189,6 @@ if st.session_state.get("active_tab") not in abas:
 
 _tab_objs = st.tabs(abas)
 
-def go(tab_label: str):
-    if tab_label in abas:
-        st.session_state["active_tab"] = tab_label
-        st.rerun()
-
 # =============================
 # HOME
 # =============================
@@ -202,20 +197,25 @@ with _tab_objs[abas.index("Home")]:
     st.markdown(f"## 🏠 Bem-vindo, {user_name} 👋")
     st.write("Use os cards abaixo para navegar entre os módulos ou o menu de abas no topo.")
 
-    # Cards com badges
     c1, c2, c3 = st.columns(3)
     with c1:
         st.markdown('<div class="card"><div class="card-title">📈 Comercial <span class="badge badge-upd">Atualizado</span></div>'
                     '<div class="card-desc">Vendas por produto, região e período. Estoques e distribuição.</div></div>', unsafe_allow_html=True)
-        st.button("Ir para Comercial", on_click=lambda: go("Comercial"))
+        if st.button("Ir para Comercial"):
+            st.session_state["active_tab"] = "Comercial"
+            st.experimental_rerun()
     with c2:
         st.markdown('<div class="card"><div class="card-title">👥 Gestão de Pessoas <span class="badge badge-new">Novo</span></div>'
                     '<div class="card-desc">Distribuição salarial, colaboradores e jornada laboral.</div></div>', unsafe_allow_html=True)
-        st.button("Ir para Gestão de Pessoas", on_click=lambda: go("Gestão de Pessoas"))
+        if st.button("Ir para Gestão de Pessoas"):
+            st.session_state["active_tab"] = "Gestão de Pessoas"
+            st.experimental_rerun()
     with c3:
         st.markdown('<div class="card"><div class="card-title">💰 Financeiro <span class="badge badge-lock">Restrito</span></div>'
                     '<div class="card-desc">(Admin) Fluxo financeiro, receitas e indicadores.</div></div>', unsafe_allow_html=True)
-        st.button("Ir para Financeiro", disabled=(role != "admin"), on_click=lambda: go("Financeiro"))
+        if st.button("Ir para Financeiro", disabled=(role != "admin")):
+            st.session_state["active_tab"] = "Financeiro"
+            st.experimental_rerun()
 
     st.markdown("---")
     st.markdown("### 📰 Hub de Notícias")
@@ -238,7 +238,7 @@ with _tab_objs[abas.index("Home")]:
         if st.button("◀️ Anterior"):
             st.session_state["news_index"] = (idx - 1) % total
             st.session_state["pause_until"] = time.time() + 10
-            st.rerun()
+            st.experimental_rerun()
     with col_mid:
         play_pause = st.toggle("Autoplay", value=autoplay, help="Rotaciona automaticamente a cada 5s")
         st.session_state["autoplay"] = play_pause
@@ -246,13 +246,13 @@ with _tab_objs[abas.index("Home")]:
         if st.button("Próxima ▶️"):
             st.session_state["news_index"] = (idx + 1) % total
             st.session_state["pause_until"] = time.time() + 10
-            st.rerun()
+            st.experimental_rerun()
 
     now = time.time()
     if st.session_state.get("autoplay", True) and now >= pause_until:
         time.sleep(5)
         st.session_state["news_index"] = (int(st.session_state.get("news_index", 0)) + 1) % total
-        st.rerun()
+        st.experimental_rerun()
 
 # =============================
 # COMERCIAL
@@ -302,4 +302,4 @@ if role == "admin" and "Financeiro" in abas:
         fig = px.line(receita_mensal, x="Mês", y="Valor", title="Receita Mensal (R$)")
         st.plotly_chart(fig, use_container_width=True)
 
-st.success("✅ Integração com arquivos JSON (usuários e notícias) concluída!")
+st.success("✅ Correção dos botões aplicada e JSON integrado!")
