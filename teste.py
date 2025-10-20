@@ -45,8 +45,8 @@ np.random.seed(42)
 # Login simples
 # =============================
 DEFAULT_USERS = {
-    "admin": {"name": "Admin", "password": "12345", "role": "admin"},
-    "guest": {"name": "Convidado", "password": "guest123", "role": "guest"},
+    "bruno": {"name": "Bruno", "password": "Bruno@1828", "role": "admin"},
+    "convidado": {"name": "Convidado", "password": "guest123", "role": "guest"},
 }
 
 if 'auth' not in st.session_state:
