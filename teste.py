@@ -1,30 +1,13 @@
 """
-Dashboard Corporativo – Contexto Brasileiro (Streamlit)
-Versão Híbrida (Desktop + Mobile) com Login obrigatório + Home + Hub de Notícias (Auto + Manual)
-Agora com integração de usuários e notícias via arquivos JSON externos e correção dos botões de navegação.
+Space Dashboard v4.3.1 — Streamlit
+- Login via usuarios.json (raiz) + roles (admin/guest)
+- Notícias via noticias.json (raiz)
+- Barra 'Space' fixa (sempre no topo), profundidade, tema adaptativo
+- Logout como texto clicável (estilizado)
+- Páginas com múltiplos gráficos (Comercial, RH, Financeiro)
 
 Requisitos:
     pip install streamlit pandas numpy pyarrow plotly faker
-
-Como executar:
-    streamlit run app.py
-
-Arquivos externos esperados na mesma pasta:
-- usuarios.json
-- noticias.json
-
-Estrutura usuarios.json:
-[
-  {"username": "admin", "name": "Admin", "password": "12345", "role": "admin"},
-  {"username": "guest", "name": "Convidado", "password": "guest123", "role": "guest"}
-]
-
-Estrutura noticias.json:
-[
-  {"titulo": "Novidade!", "texto": "Agora o catálogo de clientes está ligado diretamente ao nosso banco do Oracle Cloud.", "icone": "🆕"},
-  {"titulo": "Novo Dashboard!", "texto": "Acesse agora os dados de Jornada Laboral na aba Gestão de Pessoas.", "icone": "📊"},
-  {"titulo": "Treinamento!", "texto": "Faça parte do novo bootcamp da área de Data & Analytics.", "icone": "🎓"}
-]
 """
 
 import streamlit as st
@@ -33,273 +16,301 @@ import numpy as np
 import plotly.express as px
 from faker import Faker
 from datetime import datetime
-import json
-import os
-import time
+import json, os
 
 # =============================
-# Configuração e estilo
+# CONFIG GERAL + TEMA
 # =============================
-st.set_page_config(page_title="Dashboard Corporativo", layout="wide", initial_sidebar_state="collapsed")
-st.markdown(
-    """
+st.set_page_config(page_title="Space Dashboard", layout="wide")
+
+base_theme = (st.get_option("theme.base") or "light").lower()
+is_dark = base_theme == "dark"
+
+BG       = "#1e293b" if is_dark else "#ffffff"
+TEXT     = "#f8fafc" if is_dark else "#0f172a"
+PRIMARY  = "#ffffff" if is_dark else "#1a56db"   # 'Space' em branco no escuro, azul no claro
+BORDER   = "#334155" if is_dark else "#e5e7eb"
+HOVER    = "#475569" if is_dark else "#f1f5f9"
+SHADOW   = "0 3px 12px rgba(0,0,0,0.25)" if is_dark else "0 3px 12px rgba(0,0,0,0.08)"
+
+# =============================
+# CSS GLOBAL
+# =============================
+st.markdown(f"""
 <style>
-[data-testid="stAppViewContainer"] {padding: 1rem !important;}
-@media (max-width: 768px) {
-  h1, h2, h3, h4, h5, h6 {font-size: 95% !important;}
-  .block-container {padding: 0.5rem !important;}
-  div[data-testid="stHorizontalBlock"] > div {width: 100% !important; display: block !important;}
-  .stPlotlyChart {min-height: 300px !important;}
-  .stDataFrame {font-size: 85% !important;}
-}
-.card {border:1px solid #eee; border-radius:14px; padding:1rem; box-shadow:0 1px 6px rgba(0,0,0,0.06); background: linear-gradient(180deg, #ffffff, #fafafa);} 
-.card:hover {box-shadow:0 4px 14px rgba(0,0,0,0.12); transform: translateY(-2px);} 
-.card-title {font-weight:700; margin-bottom:0.25rem;} 
-.card-desc {color:#444; font-size:0.95rem;}
-.badge {display:inline-block; padding:0.15rem 0.5rem; border-radius:999px; font-size:0.75rem; margin-left:0.5rem;}
-.badge-new {background:#e0f7ec; color:#067d49;}
-.badge-upd {background:#e9f2ff; color:#1a56db;}
-.badge-lock {background:#fff0f0; color:#b10000;}
+:root {{
+  --bg:{BG}; --text:{TEXT}; --primary:{PRIMARY}; --border:{BORDER}; --hover:{HOVER};
+}}
+
+html, body [data-testid="stAppViewContainer"] {{
+  background: var(--bg); color: var(--text);
+}}
+
+.navbar {{
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: linear-gradient(to bottom, var(--bg), var(--bg));
+  border-bottom: 1px solid var(--border);
+  box-shadow: {SHADOW};
+  padding: .6rem 1.2rem;
+}}
+.navbar-inner {{
+  display: flex; align-items: center; justify-content: space-between;
+}}
+.nav-left {{
+  font-weight: 800; font-size: 1.2rem; color: var(--primary);
+}}
+.nav-center {{
+  display: flex; gap: .5rem; justify-content: center;
+}}
+.nav-right {{
+  display: flex; align-items: center; gap: .6rem; color: var(--text); font-weight: 500;
+}}
+.link-like > button {{
+  background: transparent; border: none; color: var(--text);
+  padding: 0; margin: 0; font-weight: 600; cursor: pointer;
+}}
+.link-like > button:hover {{ color: var(--primary); text-decoration: underline; }}
+.separator {{ color: #9ca3af; }}
+.spacer {{ height: 64px; }} /* espaço para a navbar fixa */
+
+.stButton > button {{
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border); border-radius: 8px;
+  padding: .35rem .75rem; font-weight: 600; transition: all .2s;
+}}
+.stButton > button:hover {{ background: var(--hover); color: var(--primary); border-color: var(--primary); }}
+
+.card {{
+  border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05); background: var(--bg);
+}}
+.card-title {{ font-weight: 700; font-size: 1rem; color: var(--text); }}
+.card-desc  {{ color: #94a3b8; font-size: .9rem; }}
 </style>
-""",
-    unsafe_allow_html=True,
-)
-
-fake = Faker("pt_BR")
-np.random.seed(42)
+""", unsafe_allow_html=True)
 
 # =============================
-# Carregamento de usuários e notícias via JSON
+# HELPERS JSON
 # =============================
-def load_json_file(filename: str, default_data):
-    if os.path.exists(filename):
+def load_json(path, default):
+    if os.path.exists(path):
         try:
-            with open(filename, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception as e:
-            st.warning(f"Erro ao ler {filename}: {e}. Usando dados padrão.")
-    return default_data
-
-# Usuários padrão
-DEFAULT_USERS = [
-    {"username": "admin", "name": "Admin", "password": "12345", "role": "admin"},
-    {"username": "guest", "name": "Convidado", "password": "guest123", "role": "guest"}
-]
-
-# Notícias padrão
-DEFAULT_NOTICIAS = [
-    {"titulo": "Novidade!", "texto": "Agora o catálogo de clientes está ligado diretamente ao nosso banco do Oracle Cloud.", "icone": "🆕"},
-    {"titulo": "Novo Dashboard!", "texto": "Acesse agora os dados de Jornada Laboral na aba Gestão de Pessoas.", "icone": "📊"},
-    {"titulo": "Treinamento!", "texto": "Faça parte do novo bootcamp da área de Data & Analytics.", "icone": "🎓"}
-]
-
-USERS = load_json_file("usuarios.json", DEFAULT_USERS)
-NOTICIAS = load_json_file("noticias.json", DEFAULT_NOTICIAS)
+            st.warning(f"Erro ao ler {path}: {e}. Usando dados padrão.")
+    return default
 
 # =============================
-# Login simples (obrigatório)
+# CARREGA USUÁRIOS E NOTÍCIAS (ARQUIVOS NA RAIZ)
+# =============================
+DEFAULT_USERS = [
+    {"username": "admin", "password": "12345", "name": "Admin", "role": "admin"},
+    {"username": "guest", "password": "guest123", "name": "Convidado", "role": "guest"}
+]
+USERS = load_json("usuarios.json", DEFAULT_USERS)
+
+DEFAULT_NEWS = [
+    {"titulo":"Novidade!","texto":"Agora o catálogo de clientes está ligado diretamente ao Oracle Cloud.","icone":"🆕","data":datetime.now().strftime("%d/%m/%Y")},
+    {"titulo":"Novo Dashboard!","texto":"Acesse os dados de Jornada Laboral na aba Gestão de Pessoas.","icone":"📊","data":datetime.now().strftime("%d/%m/%Y")},
+    {"titulo":"Treinamento!","texto":"Participe do novo bootcamp de Data & Analytics.","icone":"🎓","data":datetime.now().strftime("%d/%m/%Y")}
+]
+NEWS = load_json("noticias.json", DEFAULT_NEWS)
+
+# =============================
+# ESTADO
 # =============================
 if "auth" not in st.session_state:
     st.session_state.auth = {"logged": False, "user": None}
-    st.session_state["active_tab"] = "Home"
-    st.session_state["news_index"] = 0
-    st.session_state["autoplay"] = True
-    st.session_state["pause_until"] = 0.0
+if "page" not in st.session_state:
+    st.session_state.page = "Home"
 
-with st.sidebar:
-    st.header("🔐 Login")
-    if not st.session_state.auth["logged"]:
-        u = st.text_input("Usuário", key="_u")
-        p = st.text_input("Senha", type="password", key="_p")
-        if st.button("Entrar"):
-            creds = next((user for user in USERS if user["username"] == u and user["password"] == p), None)
-            if creds:
-                st.session_state.auth = {"logged": True, "user": creds}
-                st.success(f"Bem-vindo, {creds['name']}! Preparando o ambiente...")
-                st.toast("🔄 Carregando Home...", icon="🏠")
-                st.session_state["active_tab"] = "Home"
-                st.rerun()
-            else:
-                st.error("Usuário ou senha inválidos.")
-        st.stop()
-    else:
-        user = st.session_state.auth["user"]
-        st.write(f"Usuário: **{user['name']}** | Perfil: **{user['role']}**")
-        if st.button("Sair"):
-            st.toast("Saindo...", icon="👋")
-            st.session_state.clear()
+# =============================
+# LOGIN
+# =============================
+def login_view():
+    # mostra só o título Space no topo (sem navegação)
+    st.markdown(f"""
+    <div class="navbar"><div class="navbar-inner">
+      <div class="nav-left">Space</div>
+      <div class="nav-right"></div>
+    </div></div>
+    <div class="spacer"></div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("### 🔐 Acesso ao Space")
+    u = st.text_input("Usuário")
+    p = st.text_input("Senha", type="password")
+    if st.button("Entrar"):
+        user = next((x for x in USERS if x["username"]==u and x["password"]==p), None)
+        if user:
+            st.session_state.auth = {"logged": True, "user": user}
+            st.session_state.page = "Home"
+            st.success(f"Bem-vindo(a), {user['name']}!")
             st.rerun()
+        else:
+            st.error("Usuário ou senha inválidos.")
+
+if not st.session_state.auth["logged"]:
+    login_view()
+    st.stop()
 
 user = st.session_state.auth["user"]
-role = user["role"]
+is_admin = (user.get("role") == "admin")
 
 # =============================
-# Dados fictícios (demo)
+# NAVBAR FIXA (com logout texto clicável)
 # =============================
-REGIOES = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"]
-PRODUTOS = ["Produto A", "Produto B", "Produto C", "Produto D"]
-DEPARTAMENTOS = ["Comercial", "Financeiro", "RH", "TI"]
+def navbar():
+    st.markdown('<div class="navbar"><div class="navbar-inner">', unsafe_allow_html=True)
+    col_left, col_center, col_right = st.columns([2, 7, 3])
+    with col_left:
+        st.markdown('<div class="nav-left">Space</div>', unsafe_allow_html=True)
 
-vendas = pd.DataFrame(
-    {
-        "Data": pd.date_range("2024-01-01", periods=900),
-        "Produto": np.random.choice(PRODUTOS, 900),
-        "Região": np.random.choice(REGIOES, 900),
-        "Valor": np.random.uniform(100, 10000, 900),
-        "Vendedor": [fake.first_name() for _ in range(900)],
-    }
-)
+    with col_center:
+        cols = st.columns([1, 1.4, 1.8, 1.4])
+        pages = [("🏠 Home", "Home"), ("📈 Comercial", "Comercial"), ("👥 Gestão de Pessoas", "Gestão de Pessoas")]
+        if is_admin:
+            pages.append(("💰 Financeiro", "Financeiro"))
+        for i, (label, page) in enumerate(pages):
+            with cols[i]:
+                # botão normal (aplica estilo global)
+                if st.button(label, key=f"btn_{page}"):
+                    st.session_state.page = page
+                    st.rerun()
 
-colaboradores = pd.DataFrame(
-    {
-        "Nome": [fake.name() for _ in range(200)],
-        "Departamento": np.random.choice(DEPARTAMENTOS, 200),
-        "Salário": np.random.uniform(2500, 18000, 200).round(2),
-    }
-)
+    with col_right:
+        c_a, c_sep, c_user = st.columns([1.2, 0.3, 1.5])
+        with c_a:
+            # botão estilizado como link (texto clicável)
+            st.markdown('<div class="link-like">', unsafe_allow_html=True)
+            if st.button("🚪 Sair", key="btn_logout"):
+                st.session_state.clear()
+                st.rerun()
+            st.markdown('</div>', unsafe_allow_html=True)
+        with c_sep:
+            st.markdown('<div class="nav-right"><span class="separator">|</span></div>', unsafe_allow_html=True)
+        with c_user:
+            st.markdown(f'<div class="nav-right">👤 {user["name"]}</div>', unsafe_allow_html=True)
 
-# =============================
-# Filtros Globais
-# =============================
-min_date, max_date = vendas["Data"].min().date(), vendas["Data"].max().date()
-with st.sidebar:
-    st.header("📆 Filtros Globais")
-    periodo = st.date_input("Período", (min_date, max_date), min_value=min_date, max_value=max_date)
-    reg_sel = st.multiselect("Região", REGIOES, default=REGIOES)
-    prod_sel = st.multiselect("Produto", PRODUTOS, default=PRODUTOS)
+    st.markdown('</div></div><div class="spacer"></div>', unsafe_allow_html=True)
 
-def filtro_vendas(df: pd.DataFrame) -> pd.DataFrame:
-    if isinstance(periodo, (list, tuple)) and len(periodo) == 2:
-        ini, fim = pd.to_datetime(periodo[0]), pd.to_datetime(periodo[1])
-        df = df[(df["Data"] >= ini) & (df["Data"] <= fim)]
-    return df[df["Região"].isin(reg_sel) & df["Produto"].isin(prod_sel)]
-
-vendas_f = filtro_vendas(vendas)
+navbar()
 
 # =============================
-# Tabs (inclui Home primeiro)
+# MOCK DE DADOS
 # =============================
-abas = ["Home", "Comercial", "Gestão de Pessoas"] + (["Financeiro"] if role == "admin" else [])
+fake = Faker("pt_BR")
+np.random.seed(42)
 
-if "active_tab" not in st.session_state:
-    st.session_state["active_tab"] = "Home"
-
-if st.session_state.get("active_tab") not in abas:
-    st.session_state["active_tab"] = "Home"
-
-_tab_objs = st.tabs(abas)
+vendas = pd.DataFrame({
+    "Data": pd.date_range("2024-01-01", periods=500),
+    "Produto": np.random.choice(["Produto A","Produto B","Produto C","Produto D"], 500),
+    "Região": np.random.choice(["Norte","Nordeste","Centro-Oeste","Sudeste","Sul"], 500),
+    "Valor": np.random.uniform(500, 10000, 500),
+})
+colaboradores = pd.DataFrame({
+    "Nome": [fake.name() for _ in range(300)],
+    "Departamento": np.random.choice(["Comercial","Financeiro","RH","TI"], 300),
+    "Salário": np.random.uniform(2500, 18000, 300).round(2),
+})
 
 # =============================
-# HOME
+# PÁGINAS
 # =============================
-with _tab_objs[abas.index("Home")]:
-    user_name = user['name']
-    st.markdown(f"## 🏠 Bem-vindo, {user_name} 👋")
-    st.write("Use os cards abaixo para navegar entre os módulos ou o menu de abas no topo.")
+def page_home():
+    st.markdown("## Bem-vindo ao Space 👋")
+    st.write("Explore os dashboards e acompanhe os indicadores estratégicos da organização.")
+    st.markdown("---")
 
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown('<div class="card"><div class="card-title">📈 Comercial <span class="badge badge-upd">Atualizado</span></div>'
-                    '<div class="card-desc">Vendas por produto, região e período. Estoques e distribuição.</div></div>', unsafe_allow_html=True)
-        if st.button("Ir para Comercial"):
-            st.session_state["active_tab"] = "Comercial"
-            st.experimental_rerun()
-    with c2:
-        st.markdown('<div class="card"><div class="card-title">👥 Gestão de Pessoas <span class="badge badge-new">Novo</span></div>'
-                    '<div class="card-desc">Distribuição salarial, colaboradores e jornada laboral.</div></div>', unsafe_allow_html=True)
-        if st.button("Ir para Gestão de Pessoas"):
-            st.session_state["active_tab"] = "Gestão de Pessoas"
-            st.experimental_rerun()
-    with c3:
-        st.markdown('<div class="card"><div class="card-title">💰 Financeiro <span class="badge badge-lock">Restrito</span></div>'
-                    '<div class="card-desc">(Admin) Fluxo financeiro, receitas e indicadores.</div></div>', unsafe_allow_html=True)
-        if st.button("Ir para Financeiro", disabled=(role != "admin")):
-            st.session_state["active_tab"] = "Financeiro"
-            st.experimental_rerun()
-
-    st.markdown("---")
-    st.markdown("### 📰 Hub de Notícias")
-
-    idx = int(st.session_state.get("news_index", 0))
-    autoplay = bool(st.session_state.get("autoplay", True))
-    pause_until = float(st.session_state.get("pause_until", 0.0))
-    total = len(NOTICIAS)
-    trio = [NOTICIAS[(idx + i) % total] for i in range(3)]
-
-    n1, n2, n3 = st.columns(3)
-    for n, col in zip(trio, [n1, n2, n3]):
+    for col, titulo, desc in zip(
+        [c1, c2, c3],
+        ["📈 Comercial", "👥 Gestão de Pessoas", "💰 Financeiro"],
+        ["Monitoramento de vendas e performance.", "Métricas de pessoas e salários.", "Receitas, despesas e margens (Admin)."]
+    ):
         with col:
             st.markdown(
-                f"<div class='card'><div class='card-title'>{n['icone']} {n['titulo']} <span style='float:right;color:#888;font-size:0.85rem'>{datetime.now().strftime('%d/%m/%Y')}</span></div>"
-                f"<div class='card-desc'>{n['texto']}</div></div>", unsafe_allow_html=True)
+                f"<div class='card'><div class='card-title'>{titulo}</div>"
+                f"<div class='card-desc'>{desc}</div></div>",
+                unsafe_allow_html=True
+            )
 
-    col_prev, col_mid, col_next = st.columns([1, 2, 1])
-    with col_prev:
-        if st.button("◀️ Anterior"):
-            st.session_state["news_index"] = (idx - 1) % total
-            st.session_state["pause_until"] = time.time() + 10
-            st.experimental_rerun()
-    with col_mid:
-        play_pause = st.toggle("Autoplay", value=autoplay, help="Rotaciona automaticamente a cada 5s")
-        st.session_state["autoplay"] = play_pause
-    with col_next:
-        if st.button("Próxima ▶️"):
-            st.session_state["news_index"] = (idx + 1) % total
-            st.session_state["pause_until"] = time.time() + 10
-            st.experimental_rerun()
+    st.markdown("---")
+    st.subheader("📰 Hub de Notícias")
+    ncols = st.columns(3)
+    for n, col in zip(NEWS[:3], ncols):
+        with col:
+            data_txt = n.get("data", datetime.now().strftime("%d/%m/%Y"))
+            st.markdown(
+                f"<div class='card'><div class='card-title'>{n.get('icone','📰')} {n.get('titulo','Sem título')}"
+                f"<span style='float:right;font-size:0.85rem;color:#94a3b8'>{data_txt}</span></div>"
+                f"<div class='card-desc'>{n.get('texto','')}</div></div>",
+                unsafe_allow_html=True
+            )
 
-    now = time.time()
-    if st.session_state.get("autoplay", True) and now >= pause_until:
-        time.sleep(5)
-        st.session_state["news_index"] = (int(st.session_state.get("news_index", 0)) + 1) % total
-        st.experimental_rerun()
+def page_comercial():
+    st.markdown("## 📈 Comercial")
+    st.caption("Análise de vendas por produto, região e tempo.")
+    df = vendas.copy()
+    df["Mês"] = df["Data"].dt.to_period("M").astype(str)
+
+    # KPIs
+    k1, k2, k3 = st.columns(3)
+    k1.metric("Receita Total", f"R$ {df['Valor'].sum():,.2f}".replace(",", "@").replace(".", ",").replace("@", "."))
+    k2.metric("Pedidos", f"{len(df):,}".replace(",", "."))
+    k3.metric("Ticket Médio", f"R$ {df['Valor'].mean():,.2f}".replace(",", "@").replace(".", ",").replace("@", "."))
+
+    # Gráficos
+    st.plotly_chart(px.bar(df, x="Produto", y="Valor", color="Região", title="Vendas por Produto e Região"), use_container_width=True)
+    st.plotly_chart(px.pie(df, values="Valor", names="Região", title="Participação por Região"), use_container_width=True)
+    st.plotly_chart(px.line(df.groupby("Mês")["Valor"].sum().reset_index(), x="Mês", y="Valor", title="Tendência Mensal de Vendas"), use_container_width=True)
+
+    pivot = df.pivot_table(values="Valor", index="Região", columns="Produto", aggfunc="sum").fillna(0)
+    st.plotly_chart(px.imshow(pivot, title="Heatmap - Valor por Região e Produto", color_continuous_scale="Blues"), use_container_width=True)
+
+def page_rh():
+    st.markdown("## 👥 Gestão de Pessoas")
+    st.caption("Distribuição salarial e perfil de colaboradores.")
+    df = colaboradores.copy()
+    st.plotly_chart(px.box(df, x="Departamento", y="Salário", title="Distribuição Salarial por Departamento"), use_container_width=True)
+    st.plotly_chart(px.histogram(df, x="Salário", nbins=28, title="Histograma de Salários"), use_container_width=True)
+    media_dep = df.groupby("Departamento")["Salário"].mean().reset_index()
+    st.plotly_chart(px.bar(media_dep, x="Departamento", y="Salário", title="Média Salarial por Departamento"), use_container_width=True)
+
+def page_fin():
+    if not is_admin:
+        st.warning("Acesso restrito a administradores.")
+        return
+    st.markdown("## 💰 Financeiro")
+    st.caption("Receita, despesa e margem por mês.")
+
+    df = vendas.copy()
+    df["Mês"] = df["Data"].dt.to_period("M").astype(str)
+    receita = df.groupby("Mês")["Valor"].sum().reset_index()
+    despesa = receita.copy()
+    despesa["Valor"] = receita["Valor"] * np.random.uniform(0.6, 0.95, len(receita))
+
+    st.plotly_chart(px.line(receita, x="Mês", y="Valor", title="Receita Mensal (R$)"), use_container_width=True)
+
+    comp = pd.DataFrame({"Mês": receita["Mês"], "Receita": receita["Valor"], "Despesa": despesa["Valor"]})
+    st.plotly_chart(px.bar(comp, x="Mês", y=["Receita", "Despesa"], barmode="group", title="Receita vs Despesa"), use_container_width=True)
+
+    comp["Margem %"] = ((comp["Receita"] - comp["Despesa"]) / comp["Despesa"]) * 100
+    st.plotly_chart(px.area(comp, x="Mês", y="Margem %", title="Margem (%)"), use_container_width=True)
 
 # =============================
-# COMERCIAL
+# ROTEAMENTO
 # =============================
-with _tab_objs[abas.index("Comercial")]:
-    st.subheader("📈 Comercial – Vendas")
-    df = filtro_vendas(vendas).copy()
-
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = px.bar(df.groupby("Produto")["Valor"].sum().reset_index(), x="Produto", y="Valor", title="Vendas por Produto")
-        st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        fig = px.pie(df, values="Valor", names="Região", title="Distribuição por Região")
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.dataframe(df.head(25))
-
-# =============================
-# GESTÃO DE PESSOAS
-# =============================
-with _tab_objs[abas.index("Gestão de Pessoas")]:
-    st.subheader("👥 Gestão de Pessoas")
-    df_c = colaboradores.copy()
-    dep_sel = st.multiselect("Departamento", DEPARTAMENTOS, default=DEPARTAMENTOS)
-    df_c = df_c[df_c["Departamento"].isin(dep_sel)]
-
-    col1, col2 = st.columns(2)
-    with col1:
-        fig = px.box(df_c, x="Departamento", y="Salário", title="Distribuição Salarial por Departamento")
-        st.plotly_chart(fig, use_container_width=True)
-    with col2:
-        fig = px.histogram(df_c, x="Salário", nbins=25, title="Distribuição de Salários")
-        st.plotly_chart(fig, use_container_width=True)
-
-    st.dataframe(df_c)
-
-# =============================
-# FINANCEIRO (apenas admin)
-# =============================
-if role == "admin" and "Financeiro" in abas:
-    with _tab_objs[abas.index("Financeiro")]:
-        st.subheader("💰 Financeiro")
-        df = filtro_vendas(vendas).copy()
-        df["Mês"] = df["Data"].dt.to_period("M").astype(str)
-        receita_mensal = df.groupby("Mês")["Valor"].sum().reset_index()
-        fig = px.line(receita_mensal, x="Mês", y="Valor", title="Receita Mensal (R$)")
-        st.plotly_chart(fig, use_container_width=True)
-
-st.success("✅ Correção dos botões aplicada e JSON integrado!")
+page = st.session_state.page
+if page == "Home":
+    page_home()
+elif page == "Comercial":
+    page_comercial()
+elif page == "Gestão de Pessoas":
+    page_rh()
+elif page == "Financeiro":
+    page_fin()
+else:
+    st.session_state.page = "Home"
+    st.rerun()
