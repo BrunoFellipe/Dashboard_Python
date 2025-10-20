@@ -1,0 +1,17 @@
+[
+  {
+    "titulo": "Novidade!",
+    "texto": "Agora o catálogo de clientes está ligado diretamente ao nosso banco do Oracle Cloud.",
+    "icone": "🆕"
+  },
+  {
+    "titulo": "Novo Dashboard!",
+    "texto": "Acesse agora os dados de Jornada Laboral na aba Gestão de Pessoas.",
+    "icone": "📊"
+  },
+  {
+    "titulo": "Treinamento!",
+    "texto": "Faça parte do novo bootcamp da área de Data & Analytics.",
+    "icone": "🎓"
+  }
+]
